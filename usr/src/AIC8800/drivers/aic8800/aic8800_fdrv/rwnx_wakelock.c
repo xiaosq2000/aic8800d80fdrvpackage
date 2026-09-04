@@ -11,18 +11,28 @@
 
 struct wakeup_source *rwnx_wakeup_init(const char *name)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0)
+	/* wakeup_source_create()/_add() are no longer exported since v6.16.
+	   wakeup_source_register() does both, and accepts a NULL device. */
+	return wakeup_source_register(NULL, name);
+#else
 	struct wakeup_source *ws;
 	ws = wakeup_source_create(name);
 	wakeup_source_add(ws);
 	return ws;
+#endif
 }
 
 void rwnx_wakeup_deinit(struct wakeup_source *ws)
 {
 	if (ws && ws->active)
 		__pm_relax(ws);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0)
+	wakeup_source_unregister(ws);
+#else
 	wakeup_source_remove(ws);
 	wakeup_source_destroy(ws);
+#endif
 }
 
 struct wakeup_source *rwnx_wakeup_register(struct device *dev, const char *name)
