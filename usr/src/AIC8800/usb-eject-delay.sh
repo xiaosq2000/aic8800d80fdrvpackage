@@ -4,7 +4,9 @@ eject_device() {
     if [ -L /dev/aicudisk ]; then
         rmmod aic_load_fw
         eject /dev/aicudisk
-        insmod /lib/modules/$(uname -r)/kernel/drivers/net/wireless/aic8800/aic_load_fw.ko
+        # modprobe, not a hardcoded path: DKMS installs to updates/dkms/,
+        # not the kernel/drivers tree this used to point at.
+        modprobe aic_load_fw
     fi
 }
 

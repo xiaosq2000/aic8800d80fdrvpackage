@@ -1,54 +1,89 @@
 #!/bin/bash
-Main_version=`uname -r |awk -F'.' '{print $1}'`
-Minor_version=`uname -r |awk -F'.' '{print $2}'`
+set -e
+
+DKMS_NAME=aic8800
+DKMS_VER=6.4.3.0
+MOD_SRC=/usr/src/AIC8800/drivers/aic8800
+DKMS_SRC=/usr/src/${DKMS_NAME}-${DKMS_VER}
+
 cp /usr/src/AIC8800/usb-eject-delay.sh /usr/local/bin
 cp /usr/src/AIC8800/aic.rules /etc/udev/rules.d
 udevadm trigger
 udevadm control --reload
 echo "udev done"
+
+# The dongle enumerates as a USB CD-ROM holding the Windows driver until it is
+# ejected, after which it re-enumerates as the wifi device.
 if [ -L /dev/aicudisk ]; then
-echo "device exist"
-eject /dev/aicudisk
+    echo "device exist"
+    eject /dev/aicudisk
 else
-echo "device not exist"
+    echo "device not exist"
 fi
-cd /usr/src/AIC8800/fw/
+
 rm -rf /lib/firmware/aic8800D80
 cp -rf /usr/src/AIC8800/fw/aic8800D80 /lib/firmware/
 echo "cp fw done"
-cd /usr/src/AIC8800/drivers/aic8800/
-make
-if [ $? -ne 0 ]; then
-    echo "make failed, install aic8800 wifi drvier failed"
+
+# Hand the modules to DKMS instead of building them here. Building in postinst
+# only ever produces modules for the running kernel, so the driver disappears
+# on the next kernel upgrade; DKMS rebuilds it for each new kernel apt installs.
+# The source is copied to the /usr/src/<name>-<version> layout DKMS requires,
+# which also keeps the shipped vendor tree free of build artifacts so dpkg can
+# remove it cleanly.
+# Deregister every version already registered under this name, including
+# DKMS_VER itself, so reinstalling the same version starts from a clean state.
+for old in $(dkms status -m "${DKMS_NAME}" 2>/dev/null |
+             sed -n "s|^${DKMS_NAME}/\([^,]*\),.*|\1|p" | sort -u); do
+    dkms remove -m "${DKMS_NAME}" -v "${old}" --all || true
+done
+
+rm -rf ${DKMS_SRC}
+cp -a ${MOD_SRC} ${DKMS_SRC}
+# A stale Module.symvers or .o from a previous in-place build would poison the
+# first DKMS build, which starts from a copy of this tree.
+find ${DKMS_SRC} \( -name '*.o' -o -name '*.ko' -o -name '*.mod' -o -name '*.mod.c' \
+    -o -name '.*.cmd' -o -name 'Module.symvers' -o -name 'modules.order' \) -delete
+rm -rf ${DKMS_SRC}/.tmp_versions
+
+# Drop modules a previous non-DKMS install left in the kernel tree, so the DKMS
+# copies under updates/dkms/ are the only ones depmod can find.
+find /lib/modules -path '*/kernel/drivers/net/wireless/aic8800/*' -name '*.ko*' -delete 2>/dev/null || true
+
+dkms add -m ${DKMS_NAME} -v ${DKMS_VER}
+
+# Build for every installed kernel that has headers, not just the running one.
+# When a future kernel breaks this out-of-tree driver, the previously installed
+# kernel is the recovery path, and on a wifi driver that is the difference
+# between booting with a network and booting without one. A failure on a
+# non-running kernel is only a warning; the running kernel must succeed.
+built_running=0
+for k in $(ls -1 /lib/modules | sort -V); do
+    [ -e "/lib/modules/${k}/build" ] || continue
+    if dkms install -m ${DKMS_NAME} -v ${DKMS_VER} -k "${k}"; then
+        if [ "${k}" = "$(uname -r)" ]; then
+            built_running=1
+        fi
+    else
+        echo "warning: dkms build failed for ${k}"
+        echo "build log: /var/lib/dkms/${DKMS_NAME}/${DKMS_VER}/${k}/$(uname -m)/log/make.log"
+    fi
+done
+if [ ${built_running} -ne 1 ]; then
+    echo "dkms install failed for the running kernel $(uname -r), install aic8800 wifi driver failed"
     exit 1
 fi
-make install
-if [ $? -ne 0 ]; then
-    echo "make install failed, install aic8800 wifi driver failed"
-    exit 1
-fi
+echo "dkms install done"
+
 modprobe cfg80211
-insmod /usr/src/AIC8800/drivers/aic8800/aic_load_fw/aic_load_fw.ko
-if [ $? -ne 0 ]; then
-    echo "insmode aic_load_fw failed, install aic8800 wifi driver failed"
-    exit 1
-fi
-insmod /usr/src/AIC8800/drivers/aic8800/aic8800_fdrv/aic8800_fdrv.ko
-if [ $? -ne 0 ]; then
-    echo "insmod aic8800_fdrv failed, install aic8800 wifi drvier failed"
-    exit 1
-fi
-echo "insmod done"
+modprobe aic_load_fw || { echo "modprobe aic_load_fw failed"; exit 1; }
+modprobe aic8800_fdrv || { echo "modprobe aic8800_fdrv failed"; exit 1; }
+echo "modprobe done"
+
+# Userspace RF test tools (wifi_test, bt_test), unrelated to the kernel modules.
 cd /usr/src/AIC8800/aicrf_test/
 make
-if [ $? -ne 0 ]; then
-    echo "make failed, install aic8800 wifi driver failed"
-    exit 1
-fi
 make install
-if [ $? -ne 0 ]; then
-    echo "make install failed, install aic8800 wifi driver failed"
-    exit 1
-fi
+
 echo "Install aic8800 wifi driver successful!!!!!"
 exit 0
