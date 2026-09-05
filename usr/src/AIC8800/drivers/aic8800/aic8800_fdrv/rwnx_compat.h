@@ -45,6 +45,18 @@
 #define IEEE80211_MAX_AMPDU_BUF IEEE80211_MAX_AMPDU_BUF_HE
 #endif
 
+/* v6.17 added a link_id argument to report which MLO link the frame came in
+   on. This driver is not MLO capable, so callers pass -1 ("not applicable").
+   cfg80211.h is included first so that the macros below cannot rewrite the
+   kernel's own declarations if a caller ever includes this header earlier. */
+#include <net/cfg80211.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+#define cfg80211_rx_spurious_frame(dev, addr, link_id, gfp) \
+    cfg80211_rx_spurious_frame(dev, addr, gfp)
+#define cfg80211_rx_unexpected_4addr_frame(dev, addr, link_id, gfp) \
+    cfg80211_rx_unexpected_4addr_frame(dev, addr, gfp)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
 #define IEEE80211_RADIOTAP_HE 23
 #define IEEE80211_RADIOTAP_HE_MU 24
@@ -428,6 +440,34 @@ enum {
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
 typedef __s64 time64_t;
+#endif
+
+/* TIMER */
+/* These are plain renames rather than prototype changes, so unlike the rest of
+   this file they keep the historical name at the call site and map it onto
+   whichever spelling the kernel actually provides. Both headers are included
+   first so that the definitions below can never clobber a declaration that the
+   kernel still provides itself. */
+#include <linux/timer.h>
+#include <linux/preempt.h>
+
+/* del_timer()/del_timer_sync() became timer_delete()/timer_delete_sync() in
+   v6.2; the old names stayed as wrappers until they were removed in v6.15. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
+#define del_timer(t)      timer_delete(t)
+#define del_timer_sync(t) timer_delete_sync(t)
+#endif
+
+/* from_timer() was renamed timer_container_of() in v6.16 and in_irq() was
+   removed in favour of in_hardirq() in v7.0. Both are macros, so detect them
+   directly instead of keying off a version. */
+#ifndef from_timer
+#define from_timer(var, callback_timer, timer_fieldname) \
+    timer_container_of(var, callback_timer, timer_fieldname)
+#endif
+
+#ifndef in_irq
+#define in_irq() in_hardirq()
 #endif
 
 #endif /* _RWNX_COMPAT_H_ */

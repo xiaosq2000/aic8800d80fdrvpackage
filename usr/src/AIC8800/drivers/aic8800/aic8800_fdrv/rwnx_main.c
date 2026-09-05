@@ -3904,6 +3904,20 @@ int rwnx_cfg80211_set_monitor_channel_(struct wiphy *wiphy,
     return rwnx_cfg80211_set_monitor_channel(wiphy, chandef);
 }
 
+/* v6.13 passes the monitor netdev to the op. The channel is a device wide
+   setting here, retrieved from rwnx_hw->monitor_vif, so the netdev is unused
+   and the internal callers keep using the two argument form above. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+static int rwnx_cfg80211_set_monitor_channel_compat(struct wiphy *wiphy,
+                                                    struct net_device *dev,
+                                                    struct cfg80211_chan_def *chandef)
+{
+    return rwnx_cfg80211_set_monitor_channel(wiphy, chandef);
+}
+#else
+#define rwnx_cfg80211_set_monitor_channel_compat rwnx_cfg80211_set_monitor_channel
+#endif
+
 
 /**
  * @probe_client: probe an associated client, must return a cookie that it
@@ -3962,7 +3976,11 @@ void rwnx_cfg80211_mgmt_frame_register(struct wiphy *wiphy,
  *	have changed. The actual parameter values are available in
  *	struct wiphy. If returning an error, no value should be changed.
  */
-static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
+static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+                                          int radio_idx,
+#endif
+                                          u32 changed)
 {
     return 0;
 }
@@ -3978,6 +3996,9 @@ static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 static int rwnx_cfg80211_set_tx_power(struct wiphy *wiphy,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
  struct wireless_dev *wdev,
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+                                      int radio_idx,
 #endif
                                       enum nl80211_tx_power_setting type, int mbm)
 {
@@ -5717,7 +5738,7 @@ static struct cfg80211_ops rwnx_cfg80211_ops = {
     .start_ap = rwnx_cfg80211_start_ap,
     .change_beacon = rwnx_cfg80211_change_beacon,
     .stop_ap = rwnx_cfg80211_stop_ap,
-    .set_monitor_channel = rwnx_cfg80211_set_monitor_channel,
+    .set_monitor_channel = rwnx_cfg80211_set_monitor_channel_compat,
     .probe_client = rwnx_cfg80211_probe_client,
 //    .mgmt_frame_register = rwnx_cfg80211_mgmt_frame_register,
     .set_wiphy_params = rwnx_cfg80211_set_wiphy_params,
@@ -8603,7 +8624,10 @@ static void __exit rwnx_mod_exit(void)
 
 module_init(rwnx_mod_init);
 module_exit(rwnx_mod_exit);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+/* v6.13 dropped the __stringify() and requires a string literal. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #endif
 MODULE_FIRMWARE(RWNX_CONFIG_FW_NAME);

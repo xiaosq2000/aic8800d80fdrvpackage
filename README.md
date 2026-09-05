@@ -2,12 +2,24 @@
 
 Unofficial Linux driver for aic8800d80f (TP-LINK TL-XDN7000 wireless adaptor).
 
-Fix compile error on Linux kernel version 6.x. 
+The package fixes the compile errors that stop the official driver from building
+on Linux kernel 6.x and 7.x.
 
 - v0.0.10(Not tested, but highly suggested): Based on official driver version 20250319.
 - v0.0.3(Tested, not stable with some noticeable bugs): Based on official driver version 20240202.
 
 Tested on Raspberry PI 3B+ & TP-LINK TL-XDN7000 wireless adaptor.
+
+## Kernel support
+
+The official driver only builds on older kernels, so the repository carries
+fixes for the API changes made in 6.7, 6.11, 6.12, and in the range from 6.13 to
+7.0. If you are on a kernel between 6.13 and 6.17, you need the 7.0 fix as well.
+The same API changes broke the 6.13 to 6.17 range first.
+
+The 7.0 fix was built and load tested on 7.0.0-30-generic, which is kernel
+7.0.12 on x86_64. Both modules load, and the wireless device registers. The
+interface connects to an access point.
 
 ## Build from source
 
