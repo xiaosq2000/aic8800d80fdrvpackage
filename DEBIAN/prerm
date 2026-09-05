@@ -1,19 +1,30 @@
 #!/bin/bash
-rm /etc/udev/rules.d/aic.rules
-udevadm control --reload
-rm /usr/local/bin/usb-eject-delay.sh
+DKMS_NAME=aic8800
+
 echo "Uninstall aic8800 wifi driver!!!!!"
-rmmod aic8800_fdrv
-rmmod aic_load_fw
-cd /usr/src/AIC8800/drivers/aic8800/aic8800_fdrv/
-make clean
-make uninstall
-cd /usr/src/AIC8800/drivers/aic8800/aic_load_fw/
-make clean
-make uninstall
-cd /usr/src/AIC8800/aicrf_test
-make clean
+
+rm -f /etc/udev/rules.d/aic.rules
+udevadm control --reload
+rm -f /usr/local/bin/usb-eject-delay.sh
+
+rmmod aic8800_fdrv 2>/dev/null
+rmmod aic_load_fw 2>/dev/null
+
+# Deregister from DKMS, which removes the built modules from every kernel it
+# installed them into and runs depmod.
+for v in $(dkms status -m "${DKMS_NAME}" 2>/dev/null |
+           sed -n "s|^${DKMS_NAME}/\([^,]*\),.*|\1|p" | sort -u); do
+    dkms remove -m "${DKMS_NAME}" -v "${v}" --all || true
+    rm -rf "/usr/src/${DKMS_NAME}-${v}"
+done
+
+# Sweep up anything a pre-DKMS install left behind in the kernel tree.
+find /lib/modules -path '*/kernel/drivers/net/wireless/aic8800/*' -name '*.ko*' -delete 2>/dev/null
+
+cd /usr/src/AIC8800/aicrf_test 2>/dev/null && make clean
 rm -rf /lib/firmware/aic8800D80/
-rm -rf /usr/src/AIC8800/
-rm -rf /AIC8800/
-#exit 0
+
+# The files under /usr/src/AIC8800 are shipped by this package, so dpkg removes
+# them itself. Nothing builds in place any more, so there are no stray
+# artifacts left to force an rm -rf here.
+exit 0

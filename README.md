@@ -37,3 +37,26 @@ Get pre-built file from [release](https://github.com/MXWXZ/aic8800d80fdrvpackage
 ```
 dpkg -i aic8800d80fdrvpackage_0.0.10_all.deb
 ```
+
+## Kernel upgrades
+
+The modules are built and installed through DKMS, so apt rebuilds them for every
+new kernel it installs. `dkms` and `build-essential` are declared as package
+dependencies. `dpkg -i` does not resolve dependencies, so run `apt install -f`
+afterwards if they are not already present.
+
+To check which kernels the driver is built for:
+
+```
+dkms status -m aic8800
+```
+
+The package builds for every installed kernel that has headers, not only the
+running one. If a later kernel changes an API this driver has not caught up
+with, that build fails loudly during the upgrade while the modules for the
+earlier kernels stay in place, so booting the previous kernel still gives you a
+network to fix it from. The build log is at:
+
+```
+/var/lib/dkms/aic8800/<version>/<kernel>/<arch>/log/make.log
+```
