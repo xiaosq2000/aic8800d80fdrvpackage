@@ -21,7 +21,6 @@ done
 # Sweep up anything a pre-DKMS install left behind in the kernel tree.
 find /lib/modules -path '*/kernel/drivers/net/wireless/aic8800/*' -name '*.ko*' -delete 2>/dev/null
 
-cd /usr/src/AIC8800/aicrf_test 2>/dev/null && make clean
 rm -rf /lib/firmware/aic8800D80/
 
 # The files under /usr/src/AIC8800 are shipped by this package, so dpkg removes

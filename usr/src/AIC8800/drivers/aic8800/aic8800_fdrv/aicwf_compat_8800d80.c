@@ -3,6 +3,10 @@
 #include "reg_access.h"
 
 #define FW_USERCONFIG_NAME_8800D80         "aic_userconfig_8800d80.txt"
+#define FW_USERCONFIG_NAME_8800D80_U11     "aic_userconfig_8800d80_u11.txt"
+#define FW_USERCONFIG_NAME_8800D80_U11_PRO "aic_userconfig_8800d80_u11_pro.txt"
+#define FW_USERCONFIG_NAME_8800D80_U11_CUS "aic_userconfig_8800d80_u11_cus.txt"
+#define FW_USERCONFIG_NAME_8800D80_TP      "aic_userconfig_8800d80_tp.txt"
 #define FW_POWERLIMIT_NAME_8800D80         "aic_powerlimit_8800d80.txt"
 
 extern char aic_fw_path[200];
@@ -37,6 +41,13 @@ int	rwnx_plat_userconfig_load_8800d80(struct rwnx_hw *rwnx_hw){
     int size;
     u32 *dst=NULL;
     char *filename = FW_USERCONFIG_NAME_8800D80;
+    if (rwnx_hw->usbdev->pid == USB_PRODUCT_ID_TENDA_U11) {
+        filename = FW_USERCONFIG_NAME_8800D80_U11;
+    } else if (rwnx_hw->usbdev->pid == USB_PRODUCT_ID_TENDA_U11_PRO) {
+        filename = FW_USERCONFIG_NAME_8800D80_U11_PRO;
+    } else if (rwnx_hw->usbdev->vid == USB_VENDOR_ID_TP) {
+		filename = FW_USERCONFIG_NAME_8800D80_TP;
+	}
 
 #ifndef ANDROID_PLATFORM
             sprintf(aic_fw_path, "%s/%s", aic_fw_path, "aic8800D80");

@@ -1,8 +1,6 @@
 EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
 EXTRA_CFLAGS += -Wno-implicit-fallthrough
-EXTRA_CFLAGS += -Wno-attribute-warning
-EXTRA_CFLAGS += -Wno-discarded-qualifiers
-EXTRA_CFLAGS += -Wno-frame-larger-than
+#EXTRA_CFLAGS += -Wno-unused-variable
 
 RWNX_VERS_NUM := 6.4.3.0
 
@@ -84,6 +82,7 @@ CONFIG_BR_SUPPORT = n
 CONFIG_USB_MSG_OUT_EP = y
 CONFIG_USB_MSG_IN_EP = y
 CONFIG_USB_RX_REASSEMBLE = n
+CONFIG_WOWLAN = n
 
 #DCDW support tx aggr, D80 support both
 CONFIG_USB_RX_AGGR = n
@@ -120,6 +119,13 @@ CONFIG_EXT_FEM_8800DCDW = n
 # CONFIG_MCC = n for sta and p2p concurrent in same channel.
 CONFIG_MCC = y
 CONFIG_LOAD_BT_PATCH_IN_FDRV = n
+CONFIG_DYNAMIC_PWR = n
+CONFIG_DYNAMIC_PERPWR = n
+CONFIG_BAND_STEERING = n
+CONFIG_PRBREQ_REPORT = n
+
+#support D80X2 can write rf result to file
+CONFIG_WRITE_FILE_D80X2 = n
 
 ifneq ($(CONFIG_WIRELESS_EXT), y)
 CONFIG_USE_WIRELESS_EXT = n
@@ -186,6 +192,8 @@ $(MODULE_NAME)-y := \
 	aicwf_compat_8800d80.o \
 	aicwf_compat_8800d80x2.o
 
+$(MODULE_NAME)-$(CONFIG_BAND_STEERING)    += aicwf_manager.o    \
+	aicwf_steering.o
 $(MODULE_NAME)-$(CONFIG_BR_SUPPORT)       += aic_br_ext.o
 $(MODULE_NAME)-$(CONFIG_RWNX_RADAR)       += rwnx_radar.o
 $(MODULE_NAME)-$(CONFIG_DEBUG_FS)         += rwnx_debugfs.o
@@ -253,6 +261,11 @@ ccflags-$(CONFIG_RWNX_MUMIMO_TX) += -DCONFIG_RWNX_MUMIMO_TX
 ccflags-$(CONFIG_RFTEST) += -DCONFIG_RFTEST
 ccflags-$(CONFIG_MCC) += -DCONFIG_MCC
 ccflags-$(CONFIG_LOAD_BT_PATCH_IN_FDRV) += -DCONFIG_LOAD_BT_PATCH_IN_FDRV
+ccflags-$(CONFIG_DYNAMIC_PWR) += -DCONFIG_DYNAMIC_PWR
+ccflags-$(CONFIG_DYNAMIC_PERPWR) += -DCONFIG_DYNAMIC_PERPWR
+ccflags-$(CONFIG_BAND_STEERING) += -DCONFIG_BAND_STEERING
+ccflags-$(CONFIG_PRBREQ_REPORT) += -DCONFIG_PRBREQ_REPORT
+ccflags-$(CONFIG_WRITE_FILE_D80X2) += -DRF_WRITE_FILE
 
 ifeq ($(CONFIG_SDIO_SUPPORT), y)
 ccflags-y += -DAICWF_SDIO_SUPPORT
@@ -286,7 +299,7 @@ endif
 ccflags-$(CONFIG_RX_REORDER) += -DAICWF_RX_REORDER
 ccflags-$(CONFIG_ARP_OFFLOAD) += -DAICWF_ARP_OFFLOAD
 ccflags-$(CONFIG_USE_5G) += -DUSE_5G
-ccflags-$(CONFIG_RADAR_OR_IR_DETECT) += -DRADAR_OR_IR_DETECT
+ccflags-$(CONFIG_RADAR_OR_IR_DETECT) += -DCONFIG_RADAR_OR_IR_DETECT
 ccflags-$(CONFIG_DOWNLOAD_FW)  += -DCONFIG_DOWNLOAD_FW
 ccflags-$(CONFIG_USB_BT)  += -DCONFIG_USB_BT
 ccflags-$(CONFIG_ALIGN_8BYTES)  += -DCONFIG_ALIGN_8BYTES
@@ -329,6 +342,7 @@ ccflags-$(CONFIG_FILTER_TCP_ACK) += -DCONFIG_FILTER_TCP_ACK
 ccflags-$(CONFIG_TEMP_COMP) += -DCONFIG_TEMP_COMP
 ccflags-$(CONFIG_POWER_LIMIT) += -DCONFIG_POWER_LIMIT
 ccflags-$(CONFIG_EXT_FEM_8800DCDW) += -DCONFIG_EXT_FEM_8800DCDW
+ccflags-$(CONFIG_WOWLAN) += -DCONFIG_WOWLAN
 MAKEFLAGS +=-j$(shell nproc)
 
 # Platform support list
@@ -374,7 +388,7 @@ KDIR  ?= /lib/modules/$(shell uname -r)/build
 PWD   ?= $(shell pwd)
 KVER ?= $(shell uname -r)
 MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/loongarch64/loongarch/ -e s/loong64/loongarch/)
+SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
 ARCH ?= $(SUBARCH)
 CROSS_COMPILE ?=
 endif

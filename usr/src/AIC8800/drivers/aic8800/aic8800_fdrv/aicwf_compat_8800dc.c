@@ -248,6 +248,9 @@ u32 patch_tbl_wifisetting[][2] =
     {0x0120, 0x140A0100}, //usb agg tx params(total cnt, aggr cnt, out en, global out nak)
 #endif //CONFIG_USB_TX_AGGR
     {0x00b0, 0xAD180100},
+#ifdef CONFIG_PRBREQ_REPORT
+    {0x0138, 0x00010a00}, //apm probe resp offload en
+#endif
 };
 
 u32 jump_tbl[][2] =

@@ -1,6 +1,6 @@
-Package: aic8800d80fdrvpackage
-Version: 0.0.10
-Architecture: all
+Package:aic8800d80fdrvpackage
+Version:0.0.12.8
+Architecture:all
 Depends: dkms, build-essential
-Maintainer: aic
-Description: aic8800 wifi driver deb package
+Maintainer:aic
+Description:aic8800 wifi driver deb package

@@ -13,7 +13,7 @@
 #define DRV_DESCRIPTION  "AIC BLUETOOTH"
 #define DRV_COPYRIGHT    "Copyright(c) 2015-2020 AICSemi"
 #define DRV_AUTHOR       "AICSemi"
-#define DRV_VERS_MOD "1.0"
+#define DRV_VERS_MOD "20250711"
 
 int testmode = FW_NORMAL_MODE;
 int adap_test = 0;
@@ -69,7 +69,6 @@ static void __exit aic_bluetooth_mod_exit(void)
 module_init(aic_bluetooth_mod_init);
 module_exit(aic_bluetooth_mod_exit);
 
-/* v6.13 dropped the __stringify() and requires a string literal. */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
 MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)

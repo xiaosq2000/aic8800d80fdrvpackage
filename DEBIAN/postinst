@@ -80,10 +80,5 @@ modprobe aic_load_fw || { echo "modprobe aic_load_fw failed"; exit 1; }
 modprobe aic8800_fdrv || { echo "modprobe aic8800_fdrv failed"; exit 1; }
 echo "modprobe done"
 
-# Userspace RF test tools (wifi_test, bt_test), unrelated to the kernel modules.
-cd /usr/src/AIC8800/aicrf_test/
-make
-make install
-
 echo "Install aic8800 wifi driver successful!!!!!"
 exit 0

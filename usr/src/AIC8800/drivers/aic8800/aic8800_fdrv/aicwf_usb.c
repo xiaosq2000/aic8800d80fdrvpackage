@@ -15,6 +15,7 @@
 #include "rwnx_defs.h"
 #include "usb_host.h"
 #include "rwnx_platform.h"
+#include "rwnx_msg_tx.h"
 
 #ifdef CONFIG_GPIO_WAKEUP
 #ifdef CONFIG_PLATFORM_ROCKCHIP
@@ -324,6 +325,7 @@ static void aicwf_usb_rx_complete(struct urb *urb)
         if(!aicwf_rxbuff_enqueue(usb_dev->dev, &rx_priv->rxq, rx_buff)){
             spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
             usb_err("rx_priv->rxq is over flow!!!\n");
+            complete(&rx_priv->usbdev->bus_if->busrx_trgg);
             aicwf_prealloc_rxbuff_free(rx_buff, &rx_priv->rxbuff_lock);
             aicwf_usb_rx_buf_put(usb_dev, usb_buf);
             aicwf_usb_rx_submit_all_urb_(usb_dev);
@@ -1213,6 +1215,9 @@ fail:
         usb_buf->skb = NULL;
         aicwf_usb_tx_queue(usb_dev, &usb_dev->tx_free_list, usb_buf,
                     &usb_dev->tx_free_count, &usb_dev->tx_free_lock);
+		if (ret == -ENODEV) {
+			break;
+		}
 #endif
     }
 }
@@ -2149,7 +2154,9 @@ static int aicwf_parse_usb(struct aic_usb_dev *usb_dev, struct usb_interface *in
 		if(usb_dev->chipid == PRODUCT_ID_AIC8800DC){
 			AICWFDBG(LOGERROR, "AIC8800DC change to AIC8800DW\n");
 			usb_dev->chipid = PRODUCT_ID_AIC8800DW;
-		}else if(usb_dev->chipid == PRODUCT_ID_AIC8800D81X2 ||
+		} else if (usb_dev->chipid == PRODUCT_ID_AIC8800D81) {
+            AICWFDBG(LOGINFO, "AIC8800D80\n");
+		} else if(usb_dev->chipid == PRODUCT_ID_AIC8800D81X2 ||
                 usb_dev->chipid == PRODUCT_ID_AIC8800D89X2 ||
                 usb_dev->chipid == PRODUCT_ID_AIC8800D81){
             //TODO
@@ -2346,7 +2353,9 @@ static int aicwf_usb_chipmatch(struct aic_usb_dev *usb_dev, u16_l vid, u16_l pid
 		 || pid == USB_PRODUCT_ID_TP || pid == USB_PRODUCT_ID_AIC8800D83
          || pid == USB_PRODUCT_ID_MERCURY || pid == USB_PRODUCT_ID_FAST
 		 || pid == USB_PRODUCT_ID_TENDA_U11
-         || pid == USB_PRODUCT_ID_TENDA_U11_PRO){
+         || pid == USB_PRODUCT_ID_TENDA_U11_PRO
+		 ||  pid == USB_PRODUCT_ID_AIC8800D84
+		 ||  pid == USB_PRODUCT_ID_AIC8800D85){
         usb_dev->chipid = PRODUCT_ID_AIC8800D81;
         aicwf_usb_rx_aggr = true;
         AICWFDBG(LOGINFO, "%s USE AIC8800D81\r\n", __func__);
@@ -2442,6 +2451,9 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
     usb_dev->udev = usb;
     usb_dev->dev = &usb->dev;
     usb_set_intfdata(intf, usb_dev);
+
+    usb_dev->vid = id->idVendor;
+    usb_dev->pid = id->idProduct;
 
 	ret = aicwf_usb_chipmatch(usb_dev, id->idVendor, id->idProduct);
 
@@ -2580,63 +2592,57 @@ static void aicwf_usb_disconnect(struct usb_interface *intf)
 static int aicwf_usb_suspend(struct usb_interface *intf, pm_message_t state)
 {
     struct aic_usb_dev *usb_dev =
-        (struct aic_usb_dev *) usb_get_intfdata(intf);
-#ifdef CONFIG_GPIO_WAKEUP
-	struct rwnx_vif *rwnx_vif, *tmp;
-	//unsigned long irqflags;
-#endif
-
-	printk("%s enter\r\n", __func__);
-
-#ifdef CONFIG_GPIO_WAKEUP
-//	spin_lock_irqsave(&irq_lock, irqflags);
-//	rwnx_enable_hostwake_irq();
-//    spin_unlock_irqrestore(&irq_lock, irqflags);
-    atomic_inc(&irq_count);
-
-	list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
-	if (rwnx_vif->ndev)
-		netif_device_detach(rwnx_vif->ndev);
-	}
-#endif
-
-	aicwf_usb_state_change(usb_dev, USB_SLEEP_ST);
+    (struct aic_usb_dev *) usb_get_intfdata(intf);
+    struct rwnx_vif *rwnx_vif, *tmp;
+        
+    AICWFDBG(LOGINFO, "%s enter\r\n", __func__);
+#ifdef CONFIG_WOWLAN
+    rwnx_send_dummy_reboot(usb_dev->rwnx_hw);
+#endif       
+    list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
+        if (rwnx_vif->ndev){
+            netif_tx_stop_all_queues(rwnx_vif->ndev);
+            mdelay(1000);
+        }
+    }
+    aicwf_usb_state_change(usb_dev, USB_SLEEP_ST);
     aicwf_bus_stop(usb_dev->bus_if);
 
+    list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
+        if (rwnx_vif->ndev)
+            netif_device_detach(rwnx_vif->ndev);
+    }
 
-    return 0;
+return 0;
 }
 
 static int aicwf_usb_resume(struct usb_interface *intf)
 {
     struct aic_usb_dev *usb_dev =
-        (struct aic_usb_dev *) usb_get_intfdata(intf);
-#ifdef CONFIG_GPIO_WAKEUP
-	struct rwnx_vif *rwnx_vif, *tmp;
-//	unsigned long irqflags;
-#endif
-	printk("%s enter\r\n", __func__);
+         (struct aic_usb_dev *) usb_get_intfdata(intf);
+    struct rwnx_vif *rwnx_vif, *tmp;
+    AICWFDBG(LOGINFO, "%s enter\r\n", __func__);
+    list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
+        if (rwnx_vif->ndev)
+            netif_device_attach(rwnx_vif->ndev);
+    }
 
-#ifdef CONFIG_GPIO_WAKEUP
-//	spin_lock_irqsave(&irq_lock, irqflags);
-//	rwnx_disable_hostwake_irq();
-//	spin_unlock_irqrestore(&irq_lock, irqflags);
-	atomic_dec(&irq_count);
+        if (usb_dev->state != USB_UP_ST){
+		aicwf_bus_start(usb_dev->bus_if);
+		if(g_rwnx_plat){
+			g_rwnx_plat->wait_disconnect_cb = false;
+		}
+        }
 
-	list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
-	if (rwnx_vif->ndev)
-		netif_device_attach(rwnx_vif->ndev);
-	}
-#endif
-
-    if (usb_dev->state == USB_UP_ST)
-        return 0;
-
-    aicwf_bus_start(usb_dev->bus_if);
-	if(usb_dev->msg_in_pipe){
+    list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
+        if (rwnx_vif->ndev){
+            netif_tx_wake_all_queues(rwnx_vif->ndev);
+        }
+    }
+ 	if(usb_dev->msg_in_pipe){
         aicwf_usb_rx_prepare(usb_dev);
 	}
-    return 0;
+     return 0;
 }
 
 static int aicwf_usb_reset_resume(struct usb_interface *intf)
@@ -2661,6 +2667,10 @@ static struct usb_device_id aicwf_usb_id_table[] = {
     {USB_DEVICE(USB_VENDOR_ID_TP, USB_PRODUCT_ID_FAST)},
     {USB_DEVICE(USB_VENDOR_ID_TENDA, USB_PRODUCT_ID_TENDA_U11)},
     {USB_DEVICE(USB_VENDOR_ID_TENDA, USB_PRODUCT_ID_TENDA_U11_PRO)},
+    {USB_DEVICE(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D83)},
+    {USB_DEVICE(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D84)},
+    {USB_DEVICE(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D85)},
+    {USB_DEVICE(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D88)},
 #endif
     {}
 };

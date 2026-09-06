@@ -16,9 +16,9 @@
 
 /* USB Device ID */
 #define USB_VENDOR_ID_AIC                0xA69C
-#define USB_VENDOR_ID_AIC_V2             0x368B
 #define USB_VENDOR_ID_TP                 0x2357
 #define USB_VENDOR_ID_TENDA              0x2604
+#define USB_VENDOR_ID_AIC_V2             0x368B
 
 #define USB_PRODUCT_ID_TP               0x014e
 #define USB_PRODUCT_ID_MERCURY          0x014b
@@ -43,6 +43,9 @@
 #define USB_PRODUCT_ID_AIC8800D81X2     0x8d91
 #define USB_PRODUCT_ID_AIC8800D89X2     0x8d99
 #define USB_PRODUCT_ID_AIC8800D83       0x8d83
+#define USB_PRODUCT_ID_AIC8800D84		0x8d84
+#define USB_PRODUCT_ID_AIC8800D85		0x8d85
+#define USB_PRODUCT_ID_AIC8800D88		0x8d88
 #endif
 
 enum AICWF_IC{
@@ -187,6 +190,8 @@ struct aic_usb_dev {
 #endif
 	u16 chipid;
     bool tbusy;
+	u16_l vid;
+	u16_l pid;
 };
 
 extern void aicwf_usb_exit(void);
